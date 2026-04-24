@@ -98,11 +98,11 @@ def fitness(genome):
 
         # assignment fitness: negative distance squared
         if final_distance < 1.0:
-            total_fitness += 10   # BIG reward
+            total_fitness += 10   
         else:
             total_fitness += -(final_distance ** 2)
 
-        return total_fitness / len(start_positions)
+    return total_fitness / len(start_positions)
 
 
 # ==================================================
@@ -190,6 +190,7 @@ def plot_behaviour(pop, title):
 
     plt.scatter(LIGHT_POS[0], LIGHT_POS[1], c="red", s=100, label="Light")
     plt.title(title)
+    plt.scatter(start[0], start[1], c="black", s=20)
     plt.xlabel("x position")
     plt.ylabel("y position")
     plt.xlim(-10, 10)
