@@ -9,7 +9,7 @@ np.random.seed(42)
 POP_SIZE = 50
 GENOME_LENGTH = 6
 GENERATIONS = 1000
-MUTATION_RATE = 0.05
+MUTATION_RATE = 0.1
 
 LIGHT_POS = np.array([0.0, 0.0])
 
@@ -127,17 +127,17 @@ for gen in range(GENERATIONS):
     for _ in range(POP_SIZE):
         i, j = np.random.randint(0, POP_SIZE, 2)
 
-        if fitnesses[i] > fitnesses[j]:
-            winner = population[i]
+        if np.random.rand() < 0.75:
+            winner = population[i] if fitnesses[i] > fitnesses[j] else population[j]
         else:
-            winner = population[j]
+            winner = population[np.random.randint(POP_SIZE)]
 
         child = winner.copy()
 
         # mutation
         for k in range(GENOME_LENGTH):
             if np.random.rand() < MUTATION_RATE:
-                child[k] += np.random.randn() * 0.02
+                child[k] += np.random.randn() * 0.1
 
         # clip genes between -1 and 1
         child = np.clip(child, -1, 1)
