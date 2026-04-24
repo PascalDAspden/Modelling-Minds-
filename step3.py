@@ -98,7 +98,7 @@ def fitness(genome):
 
         # assignment fitness: negative distance squared
         if final_distance < 1.0:
-            total_fitness += 10   
+            total_fitness += 50   
         else:
             total_fitness += -(final_distance ** 2)
 
