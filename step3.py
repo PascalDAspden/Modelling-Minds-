@@ -8,7 +8,7 @@ np.random.seed(42)
 # ==================================================
 POP_SIZE = 50
 GENOME_LENGTH = 6
-GENERATIONS = 3000
+GENERATIONS = 1000
 MUTATION_RATE = 0.05
 
 LIGHT_POS = np.array([0.0, 0.0])
@@ -28,7 +28,7 @@ late_pop = None
 # ==================================================
 # ROBOT SIMULATION
 # ==================================================
-def simulate_robot(genome, steps=150, start_pos=None):
+def simulate_robot(genome, steps=100, start_pos=None):
     if start_pos is None:
         x, y = np.random.uniform(-5, 5, 2)
     else:
@@ -97,9 +97,12 @@ def fitness(genome):
         )
 
         # assignment fitness: negative distance squared
-        total_fitness += -(final_distance ** 2)
+        if final_distance < 1.0:
+            total_fitness += 10   # BIG reward
+        else:
+            total_fitness += -(final_distance ** 2)
 
-    return total_fitness / len(start_positions)
+        return total_fitness / len(start_positions)
 
 
 # ==================================================
