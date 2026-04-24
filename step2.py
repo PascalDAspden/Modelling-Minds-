@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+np.random.seed(42)
 # ==================================================
 # PARAMETERS
 # ==================================================
@@ -87,7 +87,7 @@ while trial < 20000:
     if trial == 100:
         plot_population(population, "Early Population")
 
-    if trial == 10000:
+    if trial == 5000:
         plot_population(population, "Mid Population")
 
     if trial == 20000:
