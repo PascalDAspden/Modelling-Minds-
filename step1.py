@@ -2,114 +2,139 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # ==================================================
-# PARAMETERS
+# GLOBALS
 # ==================================================
-N_GENES = 64
-WORD_LENGTH = 4
-N_WORDS = N_GENES // WORD_LENGTH
+k_speed = 2.0
+RADIUS = 0.1
+b = np.pi / 4
 
-POP_SIZE = 100
-MUTATION_RATE = 0.01
-
-population = np.random.randint(0, 2, size=(POP_SIZE, N_GENES))
-fitnesses = np.zeros(POP_SIZE)
-
-fitnesses_h = []
+light_x = 0.0
+light_y = 0.0
 
 
 # ==================================================
-# PLOT POPULATION 
+# ROBOT DERIVATIVE
 # ==================================================
-def plot_population(pop, title):
-    plt.figure()
-    plt.imshow(pop, aspect='auto', cmap='gray')
-    plt.title(title)
-    plt.xlabel("Genes")
-    plt.ylabel("Individuals")
-    plt.colorbar()
-    plt.show()
+def robot_derivative(state, mode):
+    x, y, o = state
 
+    # distance robot -> light
+    d2 = (light_x - x)**2 + (light_y - y)**2
 
-# ==================================================
-# FITNESS FUNCTION
-# ==================================================
-def fitness(individual):
-    f = 0
-    for word_i in range(N_WORDS):
-        word = individual[word_i * WORD_LENGTH:(word_i + 1) * WORD_LENGTH]
-        if np.sum(word) == WORD_LENGTH:
-            f += 1
-    return f / N_WORDS
+    # sensor positions
+    lsx = x + np.cos(o + b) * RADIUS
+    lsy = y + np.sin(o + b) * RADIUS
 
+    rsx = x + np.cos(o - b) * RADIUS
+    rsy = y + np.sin(o - b) * RADIUS
 
-# ==================================================
-# EVOLUTION LOOP
-# ==================================================
-trial = 0
+    # sensor -> light distance
+    dl2 = (light_x - lsx)**2 + (light_y - lsy)**2
+    dr2 = (light_x - rsx)**2 + (light_y - rsy)**2
 
-while trial < 20000:
-    trial += 1
+    # occlusion
+    ls_is_obscured = dl2 > d2
+    rs_is_obscured = dr2 > d2
 
-    p1 = np.random.randint(POP_SIZE)
-    p2 = p1
+    # stimulation
+    ls_stimulation = 1.0 / (dl2 + 0.01)
+    rs_stimulation = 1.0 / (dr2 + 0.01)
 
-    while p2 == p1:
-        p2 = np.random.randint(POP_SIZE)
+    if ls_is_obscured:
+        ls_stimulation = 0.0
+    if rs_is_obscured:
+        rs_stimulation = 0.0
 
-    f1 = fitness(population[p1])
-    f2 = fitness(population[p2])
+    # keep values in a reasonable range
+    ls_stimulation = min(ls_stimulation, 5.0)
+    rs_stimulation = min(rs_stimulation, 5.0)
 
-    fitnesses[p1] = f1
-    fitnesses[p2] = f2
+    # ==================================================
+    # BEHAVIOURS
+    # ==================================================
+    if mode == "love":
+        L = rs_stimulation
+        R = ls_stimulation
 
-    fitnesses_h.append(fitnesses.copy())
+    elif mode == "aggression":
+        L = ls_stimulation
+        R = rs_stimulation
 
-    if f1 > f2:
-        winner = p1
-        loser = p2
+    elif mode == "explorer":
+        L = 1.5 - rs_stimulation
+        R = 1.5 - ls_stimulation
+
+    elif mode == "fear":
+        L = 1.5 - ls_stimulation
+        R = 1.5 - rs_stimulation
+
     else:
-        winner = p2
-        loser = p1
+        raise ValueError("mode must be love, aggression, explorer, or fear")
 
-    for j in range(N_GENES):
+    # stop motors going too negative or too huge
+    L += 0.05
+    R -= 0.05
+    L = np.clip(L, -2.0, 5.0)
+    R = np.clip(R, -2.0, 5.0)
 
-        # mutation
-        if np.random.rand() < MUTATION_RATE:
-            population[loser][j] = 1 - population[loser][j]
+    # motion
+    dxdt = (L + R) * np.cos(o) * k_speed
+    dydt = (L + R) * np.sin(o) * k_speed
+    dodt = (R - L) * 8.0
 
-        # crossover
-        if np.random.rand() < 0.75:
-            population[loser][j] = population[winner][j]
-
-    # ==================================================
-    # POPULATION SNAPSHOTS
-    # ==================================================
-    if trial == 100:
-        plot_population(population, "Early Population")
-
-    if trial == 10000:
-        plot_population(population, "Mid Population")
-
-    if trial == 20000:
-        plot_population(population, "Late Population")
+    return [dxdt, dydt, dodt]
 
 
 # ==================================================
-# PLOT FITNESS
+# TRAJECTORY
 # ==================================================
-plt.figure()
+def trajectory(dur, init_con, mode):
+    DT = 0.02
+    N_ITS = int(dur / DT)
 
-max_fits = [np.max(f) for f in fitnesses_h]
-min_fits = [np.min(f) for f in fitnesses_h]
-avg_fits = [np.mean(f) for f in fitnesses_h]
+    x, y, o = init_con
 
-plt.plot(max_fits, label="max")
-plt.plot(min_fits, label="min")
-plt.plot(avg_fits, label="mean")
+    xs = [x]
+    ys = [y]
+    os = [o]
 
-plt.legend()
-plt.xlabel("Trial")
-plt.ylabel("Fitness")
-plt.title("GA Fitness (Royal Road)")
+    for _ in range(N_ITS):
+        dxdt, dydt, dodt = robot_derivative([x, y, o], mode)
 
-plt.show()
+        x = x + dxdt * DT
+        y = y + dydt * DT
+        o = o + dodt * DT
+
+        xs.append(x)
+        ys.append(y)
+        os.append(o)
+
+    return xs, ys, os
+
+
+# ==================================================
+# RUN + PLOT
+# ==================================================
+if __name__ == "__main__":
+    modes = ["love", "aggression", "explorer", "fear"]
+
+    for mode in modes:
+        plt.figure(figsize=(7, 7))
+
+        for x in np.linspace(-5, 5, 5):
+            for y in np.linspace(-5, 5, 5):
+                init_con = [x, y, np.pi / 2]
+                xs, ys, _ = trajectory(10, init_con, mode)
+
+                plt.plot(xs, ys)
+                plt.plot(xs[0], ys[0], "go", markersize=4)
+                plt.plot(xs[-1], ys[-1], "rx", markersize=5)
+
+        plt.scatter([light_x], [light_y], color="red", s=120, label="light")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title(mode.capitalize())
+        plt.axis("equal")
+        plt.grid(True)
+        plt.legend()
+        plt.show()
