@@ -28,45 +28,68 @@ late_pop = None
 # ==================================================
 # ROBOT SIMULATION
 # ==================================================
-def simulate_robot(genome, steps=100, start_pos=None):
+def simulate_robot(genome, steps=200, start_pos=None):
+    # === INIT ===
     if start_pos is None:
         x, y = np.random.uniform(-5, 5, 2)
     else:
         x, y = start_pos
 
     theta = np.random.uniform(-np.pi, np.pi)
+
+    # Step 1 constants
+    k_speed = 2.0
+    RADIUS = 0.1
+    b = np.pi / 4
+
     path = [(x, y)]
 
     for _ in range(steps):
-        dx = LIGHT_POS[0] - x
-        dy = LIGHT_POS[1] - y
-        distance = np.sqrt(dx**2 + dy**2)
 
-        # simple sensor strength based on distance to light
-        sensor_strength = 1 / (distance + 0.1)
+        # === DISTANCE TO LIGHT ===
+        d2 = (LIGHT_POS[0] - x)**2 + (LIGHT_POS[1] - y)**2
 
-        # left and right sensors
-        Sleft = sensor_strength
-        Sright = sensor_strength
+        # === SENSOR POSITIONS ===
+        lsx = x + np.cos(theta + b) * RADIUS
+        lsy = y + np.sin(theta + b) * RADIUS
 
-        # required assignment controller:
-        # Mleft = p0 + p1*Sright + p2*Sleft
-        # Mright = p3 + p4*Sright + p5*Sleft
-        Mleft = genome[0] + genome[1] * Sright + genome[2] * Sleft
-        Mright = genome[3] + genome[4] * Sright + genome[5] * Sleft
+        rsx = x + np.cos(theta - b) * RADIUS
+        rsy = y + np.sin(theta - b) * RADIUS
 
-        # limit motor values
-        Mleft = np.tanh(Mleft)
-        Mright = np.tanh(Mright)
+        # === SENSOR DISTANCE ===
+        dl2 = (LIGHT_POS[0] - lsx)**2 + (LIGHT_POS[1] - lsy)**2
+        dr2 = (LIGHT_POS[0] - rsx)**2 + (LIGHT_POS[1] - rsy)**2
 
-        # robot movement
-        speed = (Mleft + Mright) / 2
-        turn = (Mright - Mleft) / 2
+        # === OCCLUSION ===
+        if dl2 > d2:
+            ls_stimulation = 0.0
+        else:
+            ls_stimulation = 1.0 / (dl2 + 0.01)
 
-        theta += turn
+        if dr2 > d2:
+            rs_stimulation = 0.0
+        else:
+            rs_stimulation = 1.0 / (dr2 + 0.01)
 
-        x += speed * np.cos(theta)
-        y += speed * np.sin(theta)
+        # clamp sensors
+        ls_stimulation = min(ls_stimulation, 5.0)
+        rs_stimulation = min(rs_stimulation, 5.0)
+
+        # === CONTROLLER (GA GENOME) ===
+        L = genome[0] + genome[1]*rs_stimulation + genome[2]*ls_stimulation
+        R = genome[3] + genome[4]*rs_stimulation + genome[5]*ls_stimulation
+
+        L = np.clip(L, -2.0, 5.0)
+        R = np.clip(R, -2.0, 5.0)
+
+        # === STEP 1 MOVEMENT (IMPORTANT) ===
+        dxdt = (L + R) * np.cos(theta) * k_speed
+        dydt = (L + R) * np.sin(theta) * k_speed
+        dodt = (R - L) * 8.0
+
+        theta += dodt * 0.02
+        x += dxdt * 0.02
+        y += dydt * 0.02
 
         path.append((x, y))
 
