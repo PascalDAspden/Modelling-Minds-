@@ -6,9 +6,9 @@ np.random.seed(42)
 # ==================================================
 # PARAMETERS
 # ==================================================
-POP_SIZE = 50
+POP_SIZE = 25
 GENOME_LENGTH = 6
-GENERATIONS = 1000
+GENERATIONS = 100
 MUTATION_RATE = 0.1
 
 LIGHT_POS = np.array([0.0, 0.0])
@@ -108,24 +108,29 @@ def fitness(genome):
         (-5, 2), (5, 2), (-2, 5), (2, -5)
     ]
 
-    total_fitness = 0
+    total = 0
 
     for start in start_positions:
         path = simulate_robot(genome, start_pos=start)
-        final_pos = path[-1]
 
-        final_distance = np.sqrt(
-            (final_pos[0] - LIGHT_POS[0])**2 +
-            (final_pos[1] - LIGHT_POS[1])**2
+        distances = np.sqrt(
+            (path[:,0] - LIGHT_POS[0])**2 +
+            (path[:,1] - LIGHT_POS[1])**2
         )
 
-        # assignment fitness: negative distance squared
-        if final_distance < 1.0:
-            total_fitness += 50   
-        else:
-            total_fitness += -(final_distance ** 2)
+        final_d = distances[-1]
 
-    return total_fitness / len(start_positions)
+        # reward closeness
+        total += 1 / (final_d + 0.1)
+
+        # strong reward for reaching light
+        if final_d < 0.5:
+            total += 20
+
+        # reward improvement (prevents circling)
+        total += (distances[0] - final_d)
+
+    return total / len(start_positions)
 
 
 # ==================================================
